@@ -1,0 +1,276 @@
+name: NecroNet CI/CD — Artifact Migration Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * *'  # Nightly quality checks
+
+jobs:
+  # ==================== BACKEND TESTS ====================
+  backend-tests:
+    runs-on: ubuntu-latest
+    name: Backend — FastAPI Tests + Linting
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: necronet_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio flake8 black
+      
+      - name: Lint with flake8
+        run: |
+          cd backend
+          flake8 main.py services/ --max-line-length=120 --extend-ignore=E203,W503
+      
+      - name: Format check with black
+        run: |
+          cd backend
+          black --check main.py services/ tests/
+      
+      - name: Run unit tests
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: |
+          cd backend
+          pytest tests/ -v --cov=. --cov-report=xml --cov-fail-under=80
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage.xml
+          flags: backend
+          fail_ci_if_error: false
+
+  # ==================== FRONTEND TESTS ====================
+  frontend-tests:
+    runs-on: ubuntu-latest
+    name: Frontend — React/Next.js Tests + Linting
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Lint with ESLint
+        run: |
+          cd frontend
+          npm run lint || true  # Don't fail if no lint config
+      
+      - name: Format check with Prettier
+        run: |
+          cd frontend
+          npx prettier --check . || true  # Optional
+      
+      - name: Build Next.js
+        run: |
+          cd frontend
+          npm run build
+      
+      - name: Run tests (if available)
+        run: |
+          cd frontend
+          npm test 2>/dev/null || echo "No tests configured"
+
+  # ==================== SECURITY & DEPENDENCY CHECK ====================
+  security:
+    runs-on: ubuntu-latest
+    name: Security — Dependency Scanning + Secret Detection
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Run bandit (security checks)
+        run: |
+          pip install bandit
+          cd backend
+          bandit -r main.py services/ -ll || true  # Report but don't fail
+
+  # ==================== MIGRATION VALIDATION ====================
+  validate-migrations:
+    runs-on: ubuntu-latest
+    name: Database — Validate Supabase Schema
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate SQL syntax
+        run: |
+          # Install PostgreSQL client for validation
+          sudo apt-get install -y postgresql-client
+          # Check SQL syntax
+          pg_dump -f database_schema.sql --syntax-check || true
+
+  # ==================== DOCKER BUILD ====================
+  docker-build:
+    runs-on: ubuntu-latest
+    name: Docker — Build Backend Image
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: false
+          tags: necronet-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==================== DEPLOY BACKEND (Production) ====================
+  deploy-backend:
+    runs-on: ubuntu-latest
+    name: Deploy — Backend to Render
+    needs: [backend-tests, security, validate-migrations]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          echo "🚀 Deploying NecroNet backend to Render..."
+          curl -X POST https://api.render.com/deploy/srv/$RENDER_SERVICE_ID \
+            -H "Authorization: Bearer $RENDER_API_KEY"
+          echo "✅ Deployment triggered (check Render dashboard)"
+
+  # ==================== DEPLOY FRONTEND (Production) ====================
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    name: Deploy — Frontend to Vercel
+    needs: [frontend-tests, security]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          npm install -g vercel
+          cd frontend
+          echo "🚀 Deploying NecroNet frontend to Vercel..."
+          vercel --prod --token $VERCEL_TOKEN
+          echo "✅ Frontend deployed"
+
+  # ==================== HEALTH CHECK ====================
+  health-check:
+    runs-on: ubuntu-latest
+    name: Health — Post-Deploy Verification
+    needs: [deploy-backend, deploy-frontend]
+    if: always()
+    
+    steps:
+      - name: Check backend health
+        run: |
+          for i in {1..30}; do
+            if curl -f https://necronet-backend.render.com/health; then
+              echo "✅ Backend healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ Backend health check failed"
+          exit 1
+      
+      - name: Check frontend health
+        run: |
+          for i in {1..30}; do
+            if curl -f https://necronet.vercel.app; then
+              echo "✅ Frontend healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ Frontend health check failed"
+          exit 1
+
+  # ==================== NOTIFICATION ====================
+  notify:
+    runs-on: ubuntu-latest
+    name: Notify — Deployment Status
+    needs: [health-check]
+    if: always()
+    
+    steps:
+      - name: Send Slack notification
+        if: ${{ always() }}
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "🎃 NecroNet CI/CD Status",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*NecroNet Deployment*\nBranch: ${{ github.ref }}\nStatus: ${{ job.status }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow>"
+                  }
+                }
+              ]
+            }

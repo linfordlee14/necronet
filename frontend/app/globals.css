@@ -1,0 +1,213 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --bg-primary: #0d0d0d;
+    --bg-secondary: #1a1a2e;
+    --bg-card: #16213e;
+    --accent-green: #00ff41;
+    --accent-purple: #9d4edd;
+    --accent-orange: #ff6b35;
+    --text-primary: #e0e0e0;
+    --text-muted: #888888;
+}
+
+html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.glow-green {
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+}
+
+.glow-purple {
+    box-shadow: 0 0 20px rgba(157, 78, 221, 0.3);
+}
+
+.glow-orange {
+    box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
+}
+
+.btn-primary {
+    @apply bg-gradient-to-r from-necro-purple to-necro-green px-6 py-3 rounded-lg font-semibold transition-all;
+}
+
+.btn-primary:hover {
+    @apply opacity-90;
+}
+
+.btn-primary:focus {
+    @apply outline-none ring-2 ring-necro-green;
+}
+
+.btn-primary:active {
+    @apply scale-95;
+}
+
+.btn-secondary {
+    @apply bg-necro-card border border-necro-muted px-6 py-3 rounded-lg font-semibold transition-all;
+}
+
+.btn-secondary:hover {
+    @apply border-necro-purple text-necro-purple;
+}
+
+.btn-secondary:focus {
+    @apply outline-none ring-2 ring-necro-purple;
+}
+
+.btn-secondary:active {
+    @apply scale-95;
+}
+
+.card {
+    @apply bg-necro-card border border-necro-muted/30 rounded-xl p-6 transition-all duration-300;
+}
+
+.card:hover {
+    @apply border-necro-purple/50;
+    box-shadow: 0 0 30px rgba(157, 78, 221, 0.15);
+}
+
+.badge {
+    @apply px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1;
+}
+
+.badge-ready {
+    @apply bg-necro-green/20 text-necro-green;
+}
+
+.badge-migrating {
+    @apply bg-necro-orange/20 text-necro-orange;
+}
+
+.badge-failed {
+    @apply bg-red-500/20 text-red-400;
+}
+
+.badge-flash {
+    @apply bg-necro-orange/20 text-necro-orange;
+}
+
+.badge-html {
+    @apply bg-necro-purple/20 text-necro-purple;
+}
+
+.badge-image {
+    @apply bg-necro-green/20 text-necro-green;
+}
+
+.progress-bar {
+    @apply h-2 bg-necro-surface rounded-full overflow-hidden;
+}
+
+.progress-bar-fill {
+    @apply h-full bg-gradient-to-r from-necro-purple to-necro-green transition-all duration-300;
+}
+
+*:focus-visible {
+    @apply outline-none ring-2 ring-necro-green ring-offset-2 ring-offset-necro-bg;
+}
+
+::selection {
+    background-color: rgba(157, 78, 221, 0.4);
+    color: white;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-purple);
+}
+
+a {
+    @apply transition-colors;
+}
+
+img {
+    @apply bg-necro-surface;
+}
+
+ruffle-embed,
+ruffle-player {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+audio::-webkit-media-controls-panel {
+    background-color: var(--bg-card);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+.toast-enter {
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast-exit {
+    animation: fadeOut 0.3s ease-out;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.skeleton {
+    @apply bg-necro-surface rounded;
+    background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-secondary) 50%, var(--bg-card) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@media (max-width: 640px) {
+    html {
+        font-size: 14px;
+    }
+}

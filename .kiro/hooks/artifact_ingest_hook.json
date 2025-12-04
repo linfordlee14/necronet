@@ -1,0 +1,9 @@
+{
+  "name": "artifact_ingest_and_migrate",
+  "description": "Kiro agent hook that triggers on artifact upload. Detects type, generates migration plan, proposes code scaffolding.",
+  "trigger": "on_artifact_upload",
+  "pattern": ["/api/artifacts/upload"],
+  "prompt": "When a user uploads a new artifact via POST /api/artifacts/upload:\n\n1. **Detect artifact type** from filename, MIME type, and file headers. Possible types: 'flash', 'html', 'image', 'archive', 'other'.\n2. **Generate a migration plan** by calling the migration_plan_generator (see separate MCP extension). The plan should include:\n   - Migration strategy (e.g., 'ruffle_embed', 'html_sanitize', 'image_optimize')\n   - Implementation steps (5-7 concrete steps)\n   - Estimated duration in seconds\n3. **Generate scaffolding code** for the migration handler:\n   - For Flash: Ruffle embed HTML template\n   - For HTML: bleach sanitizer + CSS modernization script\n   - For images: PIL/Pillow optimization + metadata extraction\n4. **Create a museum exhibit page template** (React component or HTML) that shows original vs. modernized version.\n5. **Generate a ghost narration script** (curator voice):\n   - 1-2 line backstory (e.g., \"This Flash game was released in 2003, during the golden age of Newgrounds...\")\n   - 3 bullets highlighting unique features\n   - 1-line museum note connecting to modern relevance\n6. **Propose a commit message** in the curator voice (e.g., \"🎃 feat(migration): Auto-detect Flash SWF + generate Ruffle embed for artifact-id-xyz\")\n7. **Output**: Structured JSON with all of the above, plus a status='ready_to_deploy' flag.\n\nUse the NecroNet curator steering document to maintain spooky-but-helpful tone throughout.",
+  "output_format": "json",
+  "frequency": "on_demand"
+}

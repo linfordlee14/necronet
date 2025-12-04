@@ -1,0 +1,9 @@
+{
+  "name": "migration_pipeline_quality_gate",
+  "description": "Kiro agent hook that runs when a PR is opened or on scheduled basis. Validates artifact migrations, runs tests, lints code.",
+  "trigger": "on_pr_open | on_schedule",
+  "pattern": ["backend/services/migration_service.py", "tests/test_migration.py"],
+  "prompt": "When a PR is opened or scheduled (nightly):\n\n1. **Validate migration code**:\n   - Check that Ruffle embed HTML is valid and sanitized\n   - Verify bleach configuration for HTML sanitizer (remove script, iframe, object tags)\n   - Ensure all migrations have error handling (try/except)\n2. **Run test suite**:\n   - Execute pytest for backend/ (minimum 80% coverage on critical paths)\n   - Check E2E tests (upload → migrate → playback)\n   - Verify Supabase connection + S3 access\n3. **Lint & format**:\n   - Run flake8 (Python linting)\n   - Run black (auto-format Python code)\n   - Check for trailing whitespace + consistent indentation\n4. **Security checks**:\n   - Scan for hardcoded API keys (should fail if found)\n   - Verify environment variables used (no secrets in logs)\n   - Check S3 upload function sanitizes filenames\n5. **Generate a report**:\n   - Test coverage %\n   - Lint warnings (if any)\n   - Security issues (if any)\n   - Performance metrics (average migration time)\n6. **Auto-generate a commit message**:\n   - If all checks pass: \"🎃 test(migration): All checks pass. Coverage: X%\"\n   - If issues found: \"🎃 fix(migration): Address linting + security warnings (see report)\"\n7. **Output**: Status report (pass/fail) + detailed logs for review.\n\nMaintain curator voice in all messages.",
+  "output_format": "json",
+  "frequency": "on_pr_open"
+}
